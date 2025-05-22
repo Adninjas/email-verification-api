@@ -87,7 +87,11 @@ def send_whatsapp_code(code, phone):
     try:
         # Limpar espaços ou caracteres invisíveis no número de telefone
         phone = phone.strip()
-        logging.info(f"Telefone recebido após limpeza: {phone}")
+        logging.info(f"Telefone recebido após limpeza: '{phone}'")  # Log para verificar o conteúdo do phone
+
+        # Verificar se há algum caractere invisível ou extra
+        if not phone.isprintable():
+            raise Exception(f"Telefone contém caracteres não visíveis ou inválidos: {phone}")
 
         # Verifica se o número começa com "+" e tem exatamente 14 caracteres (considerando o "+55")
         if not phone.startswith('+') or len(phone) != 14:  # 14 caracteres no total, incluindo "+55"
@@ -100,6 +104,11 @@ def send_whatsapp_code(code, phone):
         # Construir a mensagem a ser enviada
         message = f"Seu código de verificação: {code}"
         
+        # Remover qualquer espaço ou caractere não imprimível da mensagem
+        message = message.strip()
+        if not message.isprintable():
+            raise Exception(f"Mensagem contém caracteres não visíveis ou inválidos: {message}")
+
         # Verifique se o número e a mensagem estão corretamente definidos
         if not message or not phone:
             raise Exception("Parâmetros 'phone' ou 'message' estão vazios.")
