@@ -6,6 +6,7 @@ import re
 import logging
 import requests
 import os
+from urllib.parse import unquote
 
 app = Flask(__name__)
 
@@ -84,10 +85,14 @@ def fetch_verification_code():
 
 def send_whatsapp_code(code, phone):
     try:
+        # Limpar espaços ou caracteres invisíveis no número de telefone
+        phone = phone.strip()
+        logging.info(f"Telefone recebido após limpeza: {phone}")
+        
         # Verifica se o número começa com "+" e tem exatamente 13 caracteres (considerando o "+55")
         if not phone.startswith('+') or len(phone) != 13:  # 13 caracteres no total, incluindo "+55"
             raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
-
+        
         # Certificando-se de que o número começa com o código correto, como +55 para Brasil
         if not phone.startswith("+55"):
             raise Exception("Apenas números brasileiros são aceitos. O número deve começar com +55.")
@@ -95,10 +100,12 @@ def send_whatsapp_code(code, phone):
         payload = {"phone": phone, "message": f"Seu código de verificação: {code}"}
         headers = {"Content-Type": "application/json"}
         response = requests.post(ZAPI_URL, json=payload, headers=headers, timeout=10)
+        
         if response.status_code == 200:
             logging.info("Mensagem WhatsApp enviada com sucesso via Z-API")
             return True
         else:
+            logging.error(f"Erro ao enviar mensagem via Z-API: {response.status_code} - {response.text}")
             raise Exception(f"Erro ao enviar mensagem via Z-API: {response.text}")
     except Exception as e:
         logging.error(f"Erro ao enviar WhatsApp: {str(e)}")
@@ -108,12 +115,26 @@ def send_whatsapp_code(code, phone):
 def get_verification_code():
     try:
         phone = request.args.get('phone')
+        phone = unquote(phone)  # Decodificar a URL codificada
+
+        logging.info(f"Telefone recebido após decodificação: {phone}")
+
         if not phone:
             raise Exception("Número de telefone não fornecido na requisição")
+
+        # Remover espaços ou caracteres não visíveis do número de telefone
+        phone = phone.strip()
+        
+        # Validar número de telefone
+        if not phone.startswith('+') or len(phone) != 13:
+            raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
+
         code = fetch_verification_code()
         send_whatsapp_code(code, phone)
+
         return jsonify({"status": "success", "code": code}), 200
     except Exception as e:
+        logging.error(f"Erro: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
