@@ -22,20 +22,24 @@ def fetch_verification_code():
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, timeout=30)
         logging.info("Conexão IMAP estabelecida com imap.hostinger.com")
         
+        # Usar variáveis de ambiente para login
         mail.login(IMAP_USER, IMAP_PASSWORD)
         logging.info("Login IMAP bem-sucedido")
 
+        # Listar pastas IMAP para depuração
         status, folders = mail.list()
         if status == 'OK':
             logging.info(f"Pastas disponíveis: {folders}")
         else:
             logging.error(f"Erro ao listar pastas: {status}")
 
+        # Selecionar a pasta 'INBOX' (padrão em inglês)
         status, data = mail.select('INBOX')
         if status != 'OK':
             raise Exception(f"Erro ao selecionar 'INBOX': {data}")
         logging.info("Pasta 'INBOX' selecionada com sucesso")
 
+        # Busca por e-mails com "ChatGPT" no assunto
         search_criteria = '(SUBJECT "ChatGPT")'
         status, email_ids = mail.search(None, search_criteria)
         if status != 'OK':
@@ -45,6 +49,7 @@ def fetch_verification_code():
             raise Exception("Nenhum e-mail encontrado com o critério 'ChatGPT'")
         logging.info(f"E-mails encontrados: {len(email_ids)}")
 
+        # Pegar o e-mail mais recente
         latest_email_id = email_ids[-1]
         status, msg_data = mail.fetch(latest_email_id, '(RFC822)')
         if status != 'OK':
@@ -56,6 +61,7 @@ def fetch_verification_code():
             subject = subject.decode()
         logging.info(f"Assunto do e-mail: {subject}")
 
+        # Extrair o código de verificação do corpo do e-mail
         for part in msg.walk():
             if part.get_content_type() == 'text/plain':
                 body = part.get_payload(decode=True).decode()
@@ -78,14 +84,17 @@ def fetch_verification_code():
 
 def send_whatsapp_code(code, phone):
     try:
-        # Verificando se o número está no formato correto, com o código de país +55
-        if not phone.startswith('+55') or len(phone) != 13:
-            raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX")
+        # Verifica se o número começa com "+" e tem exatamente 13 caracteres (considerando o "+55")
+        if not phone.startswith('+') or len(phone) != 13:  # 13 caracteres no total, incluindo "+55"
+            raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
 
+        # Certificando-se de que o número começa com o código correto, como +55 para Brasil
+        if not phone.startswith("+55"):
+            raise Exception("Apenas números brasileiros são aceitos. O número deve começar com +55.")
+        
         payload = {"phone": phone, "message": f"Seu código de verificação: {code}"}
         headers = {"Content-Type": "application/json"}
         response = requests.post(ZAPI_URL, json=payload, headers=headers, timeout=10)
-        
         if response.status_code == 200:
             logging.info("Mensagem WhatsApp enviada com sucesso via Z-API")
             return True
@@ -108,6 +117,5 @@ def get_verification_code():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    logging.info(f"Iniciando Flask na porta {port}")
-    app.run(host='0.0.0.0', port=port)
+    # A linha abaixo ativa o modo debug e hot-reload para reiniciar automaticamente o Flask ao salvar alterações
+    app.run(host='0.0.0.0', port=5000, debug=True)
