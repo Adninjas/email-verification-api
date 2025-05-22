@@ -1,58 +1,71 @@
+from flask import Flask, jsonify, request
 import imaplib
 import email
 from email.header import decode_header
 import re
 import logging
+import requests
+import os
 
-# Configurar logging
+app = Flask(__name__)
+
 logging.basicConfig(level=logging.DEBUG)
 
-# Configurações IMAP
-imap_server = "imap.hostinger.com"
-imap_user = "chatgpt@adninjas.pro"
-imap_password = "Keylogger#0!"
+# Configurações IMAP para o webmail da Hostinger
+IMAP_SERVER = "imap.hostinger.com"
+IMAP_USER = os.getenv('IMAP_USER', 'chatgpt@adninjas.pro')
+IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')
+ZAPI_URL = "https://api.z-api.io/instances/3E17FEA36D1DF06641BB6260F2C0F8BD/token/D3E3CAA2F69A702A8D0278C4/send-text"
 
 def fetch_verification_code():
     try:
-        # Conectar ao servidor IMAP
-        mail = imaplib.IMAP4_SSL(imap_server, timeout=30)
-        logging.info("Conexão IMAP estabelecida")
-        mail.login(imap_user, imap_password)
+        mail = imaplib.IMAP4_SSL(IMAP_SERVER, timeout=30)
+        logging.info("Conexão IMAP estabelecida com imap.hostinger.com")
+        
+        # Usar variáveis de ambiente para login
+        mail.login(IMAP_USER, IMAP_PASSWORD)
         logging.info("Login IMAP bem-sucedido")
 
-        # Selecionar a pasta
-        status, data = mail.select('Caixa de entrada')
-        if status != 'OK':
-            raise Exception(f"Erro ao selecionar 'Caixa de entrada': {data}")
-        logging.info("Pasta 'Caixa de entrada' selecionada com sucesso")
+        # Listar pastas IMAP para depuração
+        status, folders = mail.list()
+        if status == 'OK':
+            logging.info(f"Pastas disponíveis: {folders}")
+        else:
+            logging.error(f"Erro ao listar pastas: {status}")
 
-        # Buscar e-mails com assunto contendo "verification" ou "code" (mais flexível)
-        search_criteria = '(SUBJECT "verification" OR SUBJECT "code")'
+        # Selecionar a pasta 'INBOX' (padrão em inglês)
+        status, data = mail.select('INBOX')
+        if status != 'OK':
+            raise Exception(f"Erro ao selecionar 'INBOX': {data}")
+        logging.info("Pasta 'INBOX' selecionada com sucesso")
+
+        # Busca por e-mails com "ChatGPT" no assunto
+        search_criteria = '(SUBJECT "ChatGPT")'
         status, email_ids = mail.search(None, search_criteria)
         if status != 'OK':
             raise Exception(f"Erro na busca IMAP: {email_ids}")
         email_ids = email_ids[0].split()
         if not email_ids:
-            raise Exception("Nenhum e-mail encontrado com os critérios de busca")
+            raise Exception("Nenhum e-mail encontrado com o critério 'ChatGPT'")
         logging.info(f"E-mails encontrados: {len(email_ids)}")
 
-        # Processar o e-mail mais recente
+        # Pegar o e-mail mais recente
         latest_email_id = email_ids[-1]
         status, msg_data = mail.fetch(latest_email_id, '(RFC822)')
         if status != 'OK':
             raise Exception(f"Erro ao buscar e-mail: {msg_data}")
 
-        # Extrair o conteúdo do e-mail
         msg = email.message_from_bytes(msg_data[0][1])
         subject = decode_header(msg['subject'])[0][0]
         if isinstance(subject, bytes):
             subject = subject.decode()
         logging.info(f"Assunto do e-mail: {subject}")
 
-        # Extrair o código (6 dígitos)
+        # Extrair o código de verificação do corpo do e-mail
         for part in msg.walk():
             if part.get_content_type() == 'text/plain':
                 body = part.get_payload(decode=True).decode()
+                logging.info(f"Corpo do e-mail: {body}")
                 code = re.search(r'\b\d{6}\b', body)
                 if code:
                     logging.info(f"Código de verificação encontrado: {code.group()}")
@@ -65,13 +78,38 @@ def fetch_verification_code():
     finally:
         try:
             mail.logout()
+            logging.info("Logout IMAP realizado")
         except:
             pass
 
-# Executar o fluxo
-if __name__ == "__main__":
+def send_whatsapp_code(code, phone):
     try:
-        code = fetch_verification_code()
-        print(f"Código extraído: {code}")
+        if not phone.startswith('+'):
+            phone = '+55' + phone
+        payload = {"phone": phone, "message": f"Seu código de verificação: {code}"}
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(ZAPI_URL, json=payload, headers=headers, timeout=10)
+        if response.status_code == 200:
+            logging.info("Mensagem WhatsApp enviada com sucesso via займа                    return True
+        else:
+            raise Exception(f"Erro ao enviar mensagem via Z-API: {response.text}")
     except Exception as e:
-        print(f"Falha: {str(e)}")
+        logging.error(f"Erro ao enviar WhatsApp: {str(e)}")
+        raise
+
+@app.route('/get-verification-code', methods=['GET'])
+def get_verification_code():
+    try:
+        phone = request.args.get('phone')
+        if not phone:
+            raise Exception("Número de telefone não fornecido na requisição")
+        code = fetch_verification_code()
+        send_whatsapp_code(code, phone)
+        return jsonify({"status": "success", "code": code}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    logging.info(f"Iniciando Flask na porta {port}")
+    app.run(host='0.0.0.0', port=port)
