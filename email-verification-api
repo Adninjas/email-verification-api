@@ -1,3 +1,3 @@
 git add app.py
-git commit -m "Corrigir seleção de pasta IMAP para INBOX"
+git commit -m "Atualizar app.py com variáveis de ambiente"
 git push origin main
