@@ -90,7 +90,8 @@ def send_whatsapp_code(code, phone):
         headers = {"Content-Type": "application/json"}
         response = requests.post(ZAPI_URL, json=payload, headers=headers, timeout=10)
         if response.status_code == 200:
-            logging.info("Mensagem WhatsApp enviada com sucesso via займа                    return True
+            logging.info("Mensagem WhatsApp enviada com sucesso via Z-API")
+            return True
         else:
             raise Exception(f"Erro ao enviar mensagem via Z-API: {response.text}")
     except Exception as e:
