@@ -18,7 +18,7 @@ def get_verification_code():
         mail.login('chatgpt@adninjas.pro', 'Keylogger#0!')
         mail.select('inbox')
 
-        # Busca e-mails de noreply@openai.com com o assunto "verification code"
+        # Busca e-mails de noreply@openai.com com o assunto "Your ChatGPT code is"
         result, data = mail.search(None, '(FROM "noreply@openai.com" Subject "verification code")')
         if not data[0]:
             mail.logout()
