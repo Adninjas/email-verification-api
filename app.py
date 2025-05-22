@@ -1,49 +1,77 @@
 import imaplib
+import email
+from email.header import decode_header
 import re
-import os  # Adicionado para usar variáveis de ambiente
-from flask import Flask, jsonify, request  # Adicionado request para pegar o parâmetro phone
+import logging
 
-app = Flask(__name__)
+# Configurar logging
+logging.basicConfig(level=logging.DEBUG)
 
-@app.route('/get_verification_code', methods=['GET'])
-def get_verification_code():
+# Configurações IMAP
+imap_server = "imap.hostinger.com"
+imap_user = "chatgpt@adninjas.pro"
+imap_password = "Keylogger#0!"
+
+def fetch_verification_code():
     try:
-        # Obtém o parâmetro phone da query string
-        phone = request.args.get('phone')
-        if not phone:
-            return jsonify({'error': 'Parâmetro phone não fornecido'}), 400
+        # Conectar ao servidor IMAP
+        mail = imaplib.IMAP4_SSL(imap_server, timeout=30)
+        logging.info("Conexão IMAP estabelecida")
+        mail.login(imap_user, imap_password)
+        logging.info("Login IMAP bem-sucedido")
 
-        # Conecta ao servidor IMAP
-        mail = imaplib.IMAP4_SSL('imap.hostinger.com')
-        mail.login('chatgpt@adninjas.pro', 'Keylogger#0!')
-        mail.select('inbox')
+        # Selecionar a pasta
+        status, data = mail.select('Caixa de entrada')
+        if status != 'OK':
+            raise Exception(f"Erro ao selecionar 'Caixa de entrada': {data}")
+        logging.info("Pasta 'Caixa de entrada' selecionada com sucesso")
 
-        # Busca e-mails de noreply@openai.com com o assunto "Your ChatGPT code is"
-        result, data = mail.search(None, '(FROM "noreply@openai.com" Subject "verification code")')
-        if not data[0]:
-            mail.logout()
-            return jsonify({'error': 'Nenhum e-mail encontrado'}), 404
+        # Buscar e-mails com assunto contendo "verification" ou "code" (mais flexível)
+        search_criteria = '(SUBJECT "verification" OR SUBJECT "code")'
+        status, email_ids = mail.search(None, search_criteria)
+        if status != 'OK':
+            raise Exception(f"Erro na busca IMAP: {email_ids}")
+        email_ids = email_ids[0].split()
+        if not email_ids:
+            raise Exception("Nenhum e-mail encontrado com os critérios de busca")
+        logging.info(f"E-mails encontrados: {len(email_ids)}")
 
-        # Pega o último e-mail encontrado
-        email_id = data[0].split()[-1]
-        result, data = mail.fetch(email_id, '(RFC822)')
-        raw_email = data[0][1].decode('utf-8')
+        # Processar o e-mail mais recente
+        latest_email_id = email_ids[-1]
+        status, msg_data = mail.fetch(latest_email_id, '(RFC822)')
+        if status != 'OK':
+            raise Exception(f"Erro ao buscar e-mail: {msg_data}")
 
-        # Extrai o código de 6 dígitos
-        match = re.search(r'\b\d{6}\b', raw_email)
-        code = match.group(0) if match else None
+        # Extrair o conteúdo do e-mail
+        msg = email.message_from_bytes(msg_data[0][1])
+        subject = decode_header(msg['subject'])[0][0]
+        if isinstance(subject, bytes):
+            subject = subject.decode()
+        logging.info(f"Assunto do e-mail: {subject}")
 
-        mail.logout()
-
-        if code:
-            return jsonify({'code': code})
-        else:
-            return jsonify({'error': 'Código não encontrado no e-mail'}), 404
+        # Extrair o código (6 dígitos)
+        for part in msg.walk():
+            if part.get_content_type() == 'text/plain':
+                body = part.get_payload(decode=True).decode()
+                code = re.search(r'\b\d{6}\b', body)
+                if code:
+                    logging.info(f"Código de verificação encontrado: {code.group()}")
+                    return code.group()
+        raise Exception("Nenhum código de verificação encontrado no e-mail")
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logging.error(f"Erro: {str(e)}")
+        raise
+    finally:
+        try:
+            mail.logout()
+        except:
+            pass
 
+# Executar o fluxo
 if __name__ == "__main__":
-    # Usa a porta fornecida pelo Render ou 5000 para desenvolvimento local
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    try:
+        code = fetch_verification_code()
+        print(f"Código extraído: {code}")
+    except Exception as e:
+        print(f"Falha: {str(e)}")
