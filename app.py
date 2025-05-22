@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.DEBUG)
 # Configurações IMAP para o webmail da Hostinger
 IMAP_SERVER = "imap.hostinger.com"
 IMAP_USER = os.getenv('IMAP_USER', 'chatgpt@adninjas.pro')
-IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')
+IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')  # Lembre-se de nunca expor suas credenciais!
 ZAPI_URL = "https://api.z-api.io/instances/3E17FEA36D1DF06641BB6260F2C0F8BD/token/D3E3CAA2F69A702A8D0278C4/send-text"
 
 def fetch_verification_code():
@@ -26,20 +26,13 @@ def fetch_verification_code():
         mail.login(IMAP_USER, IMAP_PASSWORD)
         logging.info("Login IMAP bem-sucedido")
 
-        # Listar pastas IMAP para depuração
-        status, folders = mail.list()
-        if status == 'OK':
-            logging.info(f"Pastas disponíveis: {folders}")
-        else:
-            logging.error(f"Erro ao listar pastas: {status}")
-
-        # Selecionar a pasta 'INBOX' (padrão em inglês)
+        # Selecionar a pasta 'INBOX'
         status, data = mail.select('INBOX')
         if status != 'OK':
             raise Exception(f"Erro ao selecionar 'INBOX': {data}")
         logging.info("Pasta 'INBOX' selecionada com sucesso")
 
-        # Busca por e-mails com "ChatGPT" no assunto
+        # Buscar e-mails com "ChatGPT" no assunto
         search_criteria = '(SUBJECT "ChatGPT")'
         status, email_ids = mail.search(None, search_criteria)
         if status != 'OK':
@@ -104,6 +97,11 @@ def get_verification_code():
         phone = request.args.get('phone')
         if not phone:
             raise Exception("Número de telefone não fornecido na requisição")
+        
+        # Verificar se o número de telefone está no formato correto (exemplo para +55)
+        if not re.match(r"^\+55\d{11}$", phone):
+            raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX")
+        
         code = fetch_verification_code()
         send_whatsapp_code(code, phone)
         return jsonify({"status": "success", "code": code}), 200
