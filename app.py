@@ -6,6 +6,7 @@ import re
 import logging
 import requests
 import os
+import urllib.parse  # para codificar o número corretamente
 
 app = Flask(__name__)
 
@@ -84,7 +85,7 @@ def fetch_verification_code():
 
 def send_whatsapp_code(code, phone):
     try:
-        # Verifica se o número começa com "+" e tem exatamente 13 caracteres (considerando o "+55")
+        # Garantir que o número tenha o formato correto
         if not phone.startswith('+') or len(phone) != 13:  # 13 caracteres no total, incluindo "+55"
             raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
 
@@ -92,7 +93,10 @@ def send_whatsapp_code(code, phone):
         if not phone.startswith("+55"):
             raise Exception("Apenas números brasileiros são aceitos. O número deve começar com +55.")
         
-        payload = {"phone": phone, "message": f"Seu código de verificação: {code}"}
+        # Codificar o número corretamente
+        encoded_phone = urllib.parse.quote(phone)
+
+        payload = {"phone": encoded_phone, "message": f"Seu código de verificação: {code}"}
         headers = {"Content-Type": "application/json"}
         response = requests.post(ZAPI_URL, json=payload, headers=headers, timeout=10)
         if response.status_code == 200:
