@@ -109,6 +109,9 @@ def send_whatsapp_code(code, phone):
         if not message.isprintable():
             raise Exception(f"Mensagem contém caracteres não visíveis ou inválidos: {message}")
 
+        # Log adicional para verificar a mensagem
+        logging.info(f"Mensagem a ser enviada: {message}")
+
         # Verifique se o número e a mensagem estão corretamente definidos
         if not message or not phone:
             raise Exception("Parâmetros 'phone' ou 'message' estão vazios.")
