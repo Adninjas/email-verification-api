@@ -84,8 +84,8 @@ def fetch_verification_code():
 
 def send_whatsapp_code(code, phone):
     try:
-        # Aqui verificamos se o número começa com "+" e tem no mínimo 12 caracteres (como esperado)
-        if not phone.startswith('+') or len(phone) < 12:
+        # Verifica se o número começa com "+" e tem exatamente 13 caracteres (considerando o "+55")
+        if not phone.startswith('+') or len(phone) != 13:  # 13 caracteres no total, incluindo "+55"
             raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
 
         # Certificando-se de que o número começa com o código correto, como +55 para Brasil
