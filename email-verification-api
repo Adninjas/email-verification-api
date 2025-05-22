@@ -1,3 +1,3 @@
 git add app.py
-git commit -m "Corrigir porta para 5000 e otimizar busca IMAP"
+git commit -m "Corrigir seleção de pasta IMAP para INBOX"
 git push origin main
