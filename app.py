@@ -15,30 +15,27 @@ logging.basicConfig(level=logging.DEBUG)
 IMAP_SERVER = "imap.hostinger.com"
 IMAP_USER = os.getenv('IMAP_USER', 'chatgpt@adninjas.pro')
 IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')
+ZAPI_URL = "https://api.z-api.io/instances/3E17FEA36D1DF06641BB6260F2C0F8BD/token/D3E3CAA2F69A702A8D0278C4/send-text"
 
 def fetch_verification_code():
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, timeout=30)
         logging.info("Conexão IMAP estabelecida com imap.hostinger.com")
         
-        # Usar variáveis de ambiente para login
         mail.login(IMAP_USER, IMAP_PASSWORD)
         logging.info("Login IMAP bem-sucedido")
 
-        # Listar pastas IMAP para depuração
         status, folders = mail.list()
         if status == 'OK':
             logging.info(f"Pastas disponíveis: {folders}")
         else:
             logging.error(f"Erro ao listar pastas: {status}")
 
-        # Selecionar a pasta 'INBOX' (padrão em inglês)
         status, data = mail.select('INBOX')
         if status != 'OK':
             raise Exception(f"Erro ao selecionar 'INBOX': {data}")
         logging.info("Pasta 'INBOX' selecionada com sucesso")
 
-        # Busca por e-mails com "ChatGPT" no assunto
         search_criteria = '(SUBJECT "ChatGPT")'
         status, email_ids = mail.search(None, search_criteria)
         if status != 'OK':
@@ -48,7 +45,6 @@ def fetch_verification_code():
             raise Exception("Nenhum e-mail encontrado com o critério 'ChatGPT'")
         logging.info(f"E-mails encontrados: {len(email_ids)}")
 
-        # Pegar o e-mail mais recente
         latest_email_id = email_ids[-1]
         status, msg_data = mail.fetch(latest_email_id, '(RFC822)')
         if status != 'OK':
@@ -60,17 +56,19 @@ def fetch_verification_code():
             subject = subject.decode()
         logging.info(f"Assunto do e-mail: {subject}")
 
-        # Extrair o código de verificação do corpo do e-mail
         for part in msg.walk():
             if part.get_content_type() == 'text/plain':
                 body = part.get_payload(decode=True).decode()
                 logging.info(f"Corpo do e-mail: {body}")
 
-                # Usar uma regex que captura o código logo após palavras-chave conhecidas
+                # Usar uma regex que captura o código
                 code = re.search(r"(?:Enter this code|ChatGPT Log-in Code)\s*[\W]*(\d{6})", body)
                 if code:
                     logging.info(f"Código de verificação encontrado: {code.group(1)}")
                     return code.group(1)
+                else:
+                    logging.error("Código não encontrado no corpo do e-mail.")
+                    raise Exception("Código de verificação não encontrado no e-mail.")
 
         raise Exception("Nenhum código de verificação encontrado no e-mail")
 
@@ -81,8 +79,8 @@ def fetch_verification_code():
         try:
             mail.logout()
             logging.info("Logout IMAP realizado")
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Erro ao realizar logout IMAP: {str(e)}")
 
 @app.route('/get-verification-code', methods=['GET'])
 def get_verification_code():
@@ -102,15 +100,14 @@ def get_verification_code():
         if not phone.startswith('+') or len(phone) != 14:
             raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
 
-        code = fetch_verification_code()  # Apenas obtém o código do e-mail
+        # Aqui você só busca o código e retorna
+        code = fetch_verification_code()
 
-        # Retorna o código de verificação
         return jsonify({"status": "success", "code": code}), 200
     except Exception as e:
         logging.error(f"Erro: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
-    # A linha abaixo ativa o modo debug e hot-reload para reiniciar automaticamente o Flask ao salvar alterações
     port = int(os.environ.get("PORT", 5000))  # Ajuste para usar a variável PORT
     app.run(debug=True, port=port, host="0.0.0.0")
