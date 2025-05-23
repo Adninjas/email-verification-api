@@ -4,7 +4,6 @@ import email
 from email.header import decode_header
 import re
 import logging
-import requests
 import os
 from urllib.parse import unquote
 
@@ -83,66 +82,12 @@ def fetch_verification_code():
         except:
             pass
 
-def send_whatsapp_code(code, phone):
-    try:
-        # Limpar espaços ou caracteres invisíveis no número de telefone
-        phone = phone.strip()
-        logging.info(f"Telefone recebido após limpeza: '{phone}'")  # Log para verificar o conteúdo do phone
-
-        # Verificar se há algum caractere invisível ou extra
-        if not phone.isprintable():
-            raise Exception(f"Telefone contém caracteres não visíveis ou inválidos: {phone}")
-
-        # Verifica se o número começa com "+" e tem exatamente 14 caracteres (considerando o "+55")
-        if not phone.startswith('+'):
-            phone = '+' + phone  # Adiciona o "+" se não estiver presente
-
-        if not phone.startswith('+') or len(phone) != 14:  # 14 caracteres no total, incluindo "+55"
-            raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
-
-        # Certificando-se de que o número começa com o código correto, como +55 para Brasil
-        if not phone.startswith("+55"):
-            raise Exception("Apenas números brasileiros são aceitos. O número deve começar com +55.")
-
-        # Construir a mensagem a ser enviada
-        message = f"Seu código de verificação: {code}"
-        
-        # Remover qualquer espaço ou caractere não imprimível da mensagem
-        message = message.strip()
-        if not message.isprintable():
-            raise Exception(f"Mensagem contém caracteres não visíveis ou inválidos: {message}")
-
-        # Log adicional para verificar a mensagem
-        logging.info(f"Mensagem a ser enviada: {message}")
-
-        # Verifique se o número e a mensagem estão corretamente definidos
-        if not message or not phone:
-            raise Exception("Parâmetros 'phone' ou 'message' estão vazios.")
-
-        payload = {"phone": phone, "message": message}
-        headers = {"Content-Type": "application/json"}
-
-        logging.info(f"Enviando requisição para Z-API com dados: {payload}")
-
-        # Enviar requisição para Z-API
-        response = requests.post(ZAPI_URL, json=payload, headers=headers, timeout=10)
-
-        # Verifique se a resposta da Z-API foi bem-sucedida
-        if response.status_code == 200:
-            logging.info("Mensagem WhatsApp enviada com sucesso via Z-API")
-            return True
-        else:
-            logging.error(f"Erro ao enviar mensagem via Z-API: {response.status_code} - {response.text}")
-            raise Exception(f"Erro ao enviar mensagem via Z-API: {response.text}")
-    except Exception as e:
-        logging.error(f"Erro ao enviar WhatsApp: {str(e)}")
-        raise
-
 @app.route('/get-verification-code', methods=['GET'])
 def get_verification_code():
     try:
         phone = request.args.get('phone')
         phone = unquote(phone)  # Decodificar a URL codificada
+
         logging.info(f"Telefone recebido após decodificação: {phone}")
 
         if not phone:
@@ -151,23 +96,19 @@ def get_verification_code():
         # Remover espaços ou caracteres não visíveis do número de telefone
         phone = phone.strip()
         
-        # Garantir que o número tenha o formato correto (com +55)
-        if not phone.startswith('+'):
-            phone = '+' + phone  # Adiciona o "+" se não estiver presente
-
         # Validar número de telefone
         if not phone.startswith('+') or len(phone) != 14:
             raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
 
+        # Buscar o código de verificação
         code = fetch_verification_code()
-        send_whatsapp_code(code, phone)
 
-        return jsonify({"status": "success", "code": code}), 200
+        # Retornar o código de verificação para o próximo nó
+        return jsonify({"status": "success", "code": code, "phone": phone}), 200
     except Exception as e:
         logging.error(f"Erro: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
-    # A linha abaixo ativa o modo debug e hot-reload para reiniciar automaticamente o Flask ao salvar alterações
     port = int(os.environ.get("PORT", 5000))  # Ajuste para usar a variável PORT
     app.run(debug=True, port=port, host="0.0.0.0")
