@@ -1,3 +1,22 @@
+from flask import Flask, jsonify, request
+import imaplib
+import email
+from email.header import decode_header
+import re
+import logging
+import os
+from urllib.parse import unquote
+
+app = Flask(__name__)
+
+logging.basicConfig(level=logging.DEBUG)
+
+# Configurações IMAP para o webmail da Hostinger
+IMAP_SERVER = "imap.hostinger.com"
+IMAP_USER = os.getenv('IMAP_USER', 'chatgpt@adninjas.pro')
+IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')
+ZAPI_URL = "https://api.z-api.io/instances/3E17FEA36D1DF06641BB6260F2C0F8BD/token/D3E3CAA2F69A702A8D0278C4/send-text"
+
 def fetch_verification_code():
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, timeout=30)
@@ -57,3 +76,41 @@ def fetch_verification_code():
             logging.info("Logout IMAP realizado")
         except:
             pass
+
+@app.route('/get-verification-code', methods=['GET'])
+def get_verification_code():
+    try:
+        phone = request.args.get('phone')
+        phone = unquote(phone)  # Decodificar a URL codificada
+
+        logging.info(f"Telefone recebido após decodificação: {phone}")
+
+        if not phone:
+            raise Exception("Número de telefone não fornecido na requisição")
+
+        # Remover espaços ou caracteres não visíveis do número de telefone
+        phone = phone.strip()
+
+        # Verificar se o número começa com "+" e tem exatamente 14 caracteres (considerando o "+55")
+        if not phone.startswith('+'):
+            # Adicionar o "+" se ele não estiver presente
+            phone = '+' + phone
+        
+        # Certificar que o número tenha exatamente 14 caracteres, incluindo o "+"
+        if len(phone) != 14:
+            raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
+        
+        logging.info(f"Telefone validado: {phone}")
+
+        # Chama a função para obter o código
+        code = fetch_verification_code()
+
+        return jsonify({"status": "success", "code": code}), 200
+    except Exception as e:
+        logging.error(f"Erro: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+if __name__ == "__main__":
+    # A linha abaixo ativa o modo debug e hot-reload para reiniciar automaticamente o Flask ao salvar alterações
+    port = int(os.environ.get("PORT", 5000))  # Ajuste para usar a variável PORT
+    app.run(debug=True, host='0.0.0.0', port=port)  # Garante que o Flask escute na porta correta
