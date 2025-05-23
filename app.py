@@ -60,7 +60,7 @@ def fetch_verification_code():
                 logging.info(f"Corpo do e-mail: {body}")
 
                 # A expressão regular foi alterada para capturar o código de forma mais robusta
-                code = re.search(r"(\d{6})", body)  # Buscando por qualquer sequência de 6 dígitos
+                code = re.search(r"ChatGPT\s*Log-in\s*Code.*?(\d{6})", body)  # Buscando por qualquer sequência de 6 dígitos
                 if code:
                     logging.info(f"Código de verificação encontrado: {code.group(1)}")
                     return code.group(1)
@@ -112,5 +112,5 @@ def get_verification_code():
 
 if __name__ == "__main__":
     # A linha abaixo ativa o modo debug e hot-reload para reiniciar automaticamente o Flask ao salvar alterações
-    port = int(os.environ.get("PORT", 5000))  # Ajuste para usar a variável PORT
-    app.run(debug=True, host='0.0.0.0', port=port)  # Garante que o Flask escute na porta correta
+    port = int(os.environ.get("PORT", 5000))  # Ajuste para usar a variável PORT, ou 5000 como padrão
+    app.run(debug=True, port=port, host="0.0.0.0")
