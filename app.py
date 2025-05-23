@@ -1,21 +1,3 @@
-from flask import Flask, jsonify, request
-import imaplib
-import email
-from email.header import decode_header
-import re
-import logging
-import os
-from urllib.parse import unquote
-
-app = Flask(__name__)
-
-logging.basicConfig(level=logging.DEBUG)
-
-# Configurações IMAP para o webmail da Hostinger
-IMAP_SERVER = "imap.hostinger.com"
-IMAP_USER = os.getenv('IMAP_USER', 'chatgpt@adninjas.pro')
-IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')
-
 def fetch_verification_code():
     try:
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, timeout=30)
@@ -58,8 +40,8 @@ def fetch_verification_code():
                 body = part.get_payload(decode=True).decode()
                 logging.info(f"Corpo do e-mail: {body}")
 
-                # Usar uma regex que captura o código logo após palavras-chave conhecidas
-                code = re.search(r"(?:Enter this code|ChatGPT Log-in Code)\s*[\W]*(\d{6})", body)
+                # A expressão regular foi alterada para capturar o código de forma mais robusta
+                code = re.search(r"(\d{6})", body)  # Buscando por qualquer sequência de 6 dígitos
                 if code:
                     logging.info(f"Código de verificação encontrado: {code.group(1)}")
                     return code.group(1)
@@ -75,42 +57,3 @@ def fetch_verification_code():
             logging.info("Logout IMAP realizado")
         except:
             pass
-
-@app.route('/get-verification-code', methods=['GET'])
-def get_verification_code():
-    try:
-        phone = request.args.get('phone')
-        phone = unquote(phone)  # Decodificar a URL codificada
-
-        logging.info(f"Telefone recebido após decodificação: {phone}")
-
-        if not phone:
-            raise Exception("Número de telefone não fornecido na requisição")
-
-        # Remover espaços ou caracteres não visíveis do número de telefone
-        phone = phone.strip()
-
-        # Verificar se o número começa com "+" e tem exatamente 14 caracteres (considerando o "+55")
-        if not phone.startswith('+'):
-            # Adicionar o "+" se ele não estiver presente
-            phone = '+' + phone
-        
-        # Certificar que o número tenha exatamente 14 caracteres, incluindo o "+"
-        if len(phone) != 14:
-            raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
-        
-        logging.info(f"Telefone validado: {phone}")
-
-        # Chama a função para obter o código
-        code = fetch_verification_code()
-
-        # Agora, a API Flask só irá retornar o código de verificação
-        return jsonify({"status": "success", "code": code}), 200
-    except Exception as e:
-        logging.error(f"Erro: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-if __name__ == "__main__":
-    # A linha abaixo ativa o modo debug e hot-reload para reiniciar automaticamente o Flask ao salvar alterações
-    port = int(os.environ.get("PORT", 5000))  # Ajuste para usar a variável PORT
-    app.run(debug=True, port=port, host="0.0.0.0")
