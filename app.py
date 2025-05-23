@@ -95,7 +95,11 @@ def get_verification_code():
 
         # Remover espaços ou caracteres não visíveis do número de telefone
         phone = phone.strip()
-        
+
+        # Verificar se o número de telefone tem o formato correto
+        if not phone.startswith('+'):
+            phone = '+' + phone  # Adiciona o "+" se não estiver presente
+
         # Validar número de telefone
         if not phone.startswith('+') or len(phone) != 14:
             raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
