@@ -54,18 +54,32 @@ def fetch_verification_code():
         logging.info(f"Assunto do e-mail: {subject}")
 
         # Extrair o código de verificação do corpo do e-mail
-        for part in msg.walk():
-            if part.get_content_type() == 'text/plain':
-                body = part.get_payload(decode=True).decode()
-                logging.info(f"Corpo do e-mail: {body}")
+        code = None  # Inicializa a variável 'code' para capturar o código do corpo
 
-                # A expressão regular foi alterada para capturar o código de forma mais robusta
-                code = re.search(r"ChatGPT\s*Log-in\s*Code.*?(\d{6})", body)  # Buscando por qualquer sequência de 6 dígitos
+        for part in msg.walk():
+            if part.get_content_type() == 'text/plain':  # Verificar texto simples
+                body = part.get_payload(decode=True).decode()
+                logging.info(f"Corpo do e-mail em texto simples: {body}")
+
+                # Regex para capturar 6 dígitos (código de verificação)
+                code = re.search(r"(\d{6})", body)  # Buscando qualquer sequência de 6 dígitos
                 if code:
                     logging.info(f"Código de verificação encontrado: {code.group(1)}")
-                    return code.group(1)
+                    break  # Sai do loop se encontrar o código
 
-        raise Exception("Nenhum código de verificação encontrado no e-mail")
+            elif part.get_content_type() == 'text/html':  # Verificar e-mail em HTML
+                body = part.get_payload(decode=True).decode()
+                logging.info(f"Corpo do e-mail em HTML: {body}")
+                code = re.search(r"(\d{6})", body)  # Buscando qualquer sequência de 6 dígitos em HTML
+                if code:
+                    logging.info(f"Código de verificação encontrado: {code.group(1)}")
+                    break  # Sai do loop se encontrar o código
+
+        # Verifica se o código foi encontrado
+        if code:
+            return code.group(1)
+        else:
+            raise Exception("Nenhum código de verificação encontrado no e-mail")
 
     except Exception as e:
         logging.error(f"Erro: {str(e)}")
