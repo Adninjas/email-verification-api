@@ -15,7 +15,6 @@ logging.basicConfig(level=logging.DEBUG)
 IMAP_SERVER = "imap.hostinger.com"
 IMAP_USER = os.getenv('IMAP_USER', 'chatgpt@adninjas.pro')
 IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')
-ZAPI_URL = "https://api.z-api.io/instances/3E17FEA36D1DF06641BB6260F2C0F8BD/token/D3E3CAA2F69A702A8D0278C4/send-text"
 
 def fetch_verification_code():
     try:
@@ -66,10 +65,13 @@ def fetch_verification_code():
             if part.get_content_type() == 'text/plain':
                 body = part.get_payload(decode=True).decode()
                 logging.info(f"Corpo do e-mail: {body}")
-                code = re.search(r'\b\d{6}\b', body)
+
+                # Usar uma regex que captura o código logo após palavras-chave conhecidas
+                code = re.search(r"(?:Enter this code|ChatGPT Log-in Code)\s*[\W]*(\d{6})", body)
                 if code:
-                    logging.info(f"Código de verificação encontrado: {code.group()}")
-                    return code.group()
+                    logging.info(f"Código de verificação encontrado: {code.group(1)}")
+                    return code.group(1)
+
         raise Exception("Nenhum código de verificação encontrado no e-mail")
 
     except Exception as e:
@@ -95,24 +97,20 @@ def get_verification_code():
 
         # Remover espaços ou caracteres não visíveis do número de telefone
         phone = phone.strip()
-
-        # Verificar se o número de telefone tem o formato correto
-        if not phone.startswith('+'):
-            phone = '+' + phone  # Adiciona o "+" se não estiver presente
-
+        
         # Validar número de telefone
         if not phone.startswith('+') or len(phone) != 14:
             raise Exception("Número de telefone inválido. Formato esperado: +55XXXXXXXXXXX ou equivalente.")
 
-        # Buscar o código de verificação
-        code = fetch_verification_code()
+        code = fetch_verification_code()  # Apenas obtém o código do e-mail
 
-        # Retornar o código de verificação para o próximo nó
-        return jsonify({"status": "success", "code": code, "phone": phone}), 200
+        # Retorna o código de verificação
+        return jsonify({"status": "success", "code": code}), 200
     except Exception as e:
         logging.error(f"Erro: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
+    # A linha abaixo ativa o modo debug e hot-reload para reiniciar automaticamente o Flask ao salvar alterações
     port = int(os.environ.get("PORT", 5000))  # Ajuste para usar a variável PORT
     app.run(debug=True, port=port, host="0.0.0.0")
