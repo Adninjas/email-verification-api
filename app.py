@@ -15,7 +15,6 @@ logging.basicConfig(level=logging.DEBUG)
 IMAP_SERVER = "imap.hostinger.com"
 IMAP_USER = os.getenv('IMAP_USER', 'chatgpt@adninjas.pro')
 IMAP_PASSWORD = os.getenv('IMAP_PASSWORD', 'Keylogger#0!')
-ZAPI_URL = "https://api.z-api.io/instances/3E17FEA36D1DF06641BB6260F2C0F8BD/token/D3E3CAA2F69A702A8D0278C4/send-text"
 
 def fetch_verification_code():
     try:
@@ -105,6 +104,7 @@ def get_verification_code():
         # Chama a função para obter o código
         code = fetch_verification_code()
 
+        # Agora, a API Flask só irá retornar o código de verificação
         return jsonify({"status": "success", "code": code}), 200
     except Exception as e:
         logging.error(f"Erro: {str(e)}")
